@@ -73,7 +73,7 @@ app.post("/api/contact", async (req, res) => {
     });
 
     await transporter.sendMail({
-      from: `"Fine Optics" <${process.env.EMAIL_USER}>`,
+      from: `"Fine Optical" <${process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER,
       subject: "New Contact Inquiry",
       html: `
