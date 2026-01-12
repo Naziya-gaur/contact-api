@@ -14,13 +14,13 @@ app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: "10kb" }));
 
 /* RATE LIMIT */
-app.use(
-  "/api/contact",
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 20
-  })
-);
+app.use("/api/contact", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false
+}));
+
 
 /* MONGODB CONNECT */
 mongoose
@@ -93,6 +93,6 @@ app.post("/api/contact", async (req, res) => {
 });
 
 /* START SERVER */
-app.listen(process.env.PORT, () => {
+app.listen(process.env.PORT || 5000, () => {
   console.log(`Server running on port ${process.env.PORT}`);
 });

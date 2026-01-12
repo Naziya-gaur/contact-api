@@ -10,8 +10,8 @@ const ContactInquirySchema = new mongoose.Schema({
   city: String,
   region: String,
   country: String,
-  latitude: String,
-  longitude: String,
+  latitude: Number,
+  longitude: Number,
 
   ip_address: String,
 
