@@ -9,18 +9,33 @@ const ContactInquiry = require("./models/ContactInquiry");
 
 const app = express();
 
-/* MIDDLEWARE */
-app.use(cors({ origin: '*' }));
+/* ===================== MIDDLEWARE ===================== */
+app.use(cors({ origin: "*" }));
 app.use(express.json({ limit: "10kb" }));
 
-/* RATE LIMIT */
-app.use("/api/contact", rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false
-}));
+/* ===================== RATE LIMIT ===================== */
+app.use(
+  "/api/contact",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false
+  })
+);
 
+/* ===================== MONGODB ===================== */
+mongoose.set("strictQuery", true);
+
+mongoose
+  .connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000
+  })
+  .then(() => console.log("MongoDB connected"))
+  .catch(err => console.error("Mongo error:", err.message));
+
+/* ===================== EMAIL BACKGROUND TASK ===================== */
 async function sendEmailInBackground(data) {
   try {
     const transporter = nodemailer.createTransport({
@@ -39,7 +54,7 @@ async function sendEmailInBackground(data) {
       to: process.env.EMAIL_USER,
       subject: "New Contact Inquiry",
       html: `
-        <b>Name:</b> ${data.first_name} ${data.last_name}<br>
+        <b>Name:</b> ${data.first_name} ${data.last_name || ""}<br>
         <b>Email:</b> ${data.email}<br>
         <b>Phone:</b> ${data.phone || "-"}<br>
         <b>Message:</b> ${data.message}<br>
@@ -54,42 +69,35 @@ async function sendEmailInBackground(data) {
   }
 }
 
+/* ===================== API ===================== */
+app.post("/api/contact", (req, res) => {
+  const data = req.body;
 
-/* MONGODB CONNECT */
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.error("Mongo error:", err));
-
-/* API */
-app.post("/api/contact", async (req, res) => {
-  try {
-    const data = req.body;
-
-    if (!data.first_name || !data.email || !data.message) {
-      return res.status(400).json({ message: "Required fields missing" });
-    }
-
-    // Save to DB
-    await ContactInquiry.create({
-      ...data,
-      ip_address: req.ip
-    });
-
-    // ✅ RESPOND FIRST (FAST)
-    res.json({ message: "Inquiry submitted successfully" });
-
-    // ✅ EMAIL RUNS IN BACKGROUND
-    sendEmailInBackground(data);
-
-  } catch (err) {
-    console.error("API error:", err);
-    res.status(500).json({ message: "Server error" });
+  if (!data.first_name || !data.email || !data.message) {
+    return res.status(400).json({ message: "Required fields missing" });
   }
+
+  // RESPOND IMMEDIATELY (NO WAITING)
+  res.json({ message: "Inquiry submitted successfully" });
+
+  // BACKGROUND TASKS
+  setImmediate(async () => {
+    try {
+      await ContactInquiry.create({
+        ...data,
+        ip_address: req.ip
+      });
+
+      sendEmailInBackground(data);
+
+    } catch (err) {
+      console.error("Background task failed:", err.message);
+    }
+  });
 });
 
-
-/* START SERVER */
-app.listen(process.env.PORT || 5000, () => {
-  console.log(`Server running on port ${process.env.PORT}`);
+/* ===================== SERVER ===================== */
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
