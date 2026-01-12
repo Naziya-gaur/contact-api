@@ -21,6 +21,39 @@ app.use("/api/contact", rateLimit({
   legacyHeaders: false
 }));
 
+async function sendEmailInBackground(data) {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000
+    });
+
+    await transporter.sendMail({
+      from: `"Fine Optical" <${process.env.EMAIL_USER}>`,
+      to: process.env.EMAIL_USER,
+      subject: "New Contact Inquiry",
+      html: `
+        <b>Name:</b> ${data.first_name} ${data.last_name}<br>
+        <b>Email:</b> ${data.email}<br>
+        <b>Phone:</b> ${data.phone || "-"}<br>
+        <b>Message:</b> ${data.message}<br>
+        <b>Location:</b> ${data.city || "-"}, ${data.region || "-"}, ${data.country || "-"}
+      `
+    });
+
+    console.log("Email sent successfully");
+
+  } catch (err) {
+    console.error("Email error:", err.message);
+  }
+}
+
 
 /* MONGODB CONNECT */
 mongoose
@@ -31,66 +64,30 @@ mongoose
 /* API */
 app.post("/api/contact", async (req, res) => {
   try {
-    const {
-      first_name,
-      last_name,
-      email,
-      phone,
-      message,
-      city,
-      region,
-      country,
-      latitude,
-      longitude
-    } = req.body;
+    const data = req.body;
 
-    if (!first_name || !email || !message) {
+    if (!data.first_name || !data.email || !data.message) {
       return res.status(400).json({ message: "Required fields missing" });
     }
 
-    /* SAVE TO DB */
+    // Save to DB
     await ContactInquiry.create({
-      first_name,
-      last_name,
-      email,
-      phone,
-      message,
-      city,
-      region,
-      country,
-      latitude,
-      longitude,
+      ...data,
       ip_address: req.ip
     });
 
-    /* EMAIL */
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
+    // ✅ RESPOND FIRST (FAST)
+    res.json({ message: "Inquiry submitted successfully" });
 
-    await transporter.sendMail({
-      from: `"Fine Optical" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER,
-      subject: "New Contact Inquiry",
-      html: `
-        <b>Name:</b> ${first_name} ${last_name}<br>
-        <b>Email:</b> ${email}<br>
-        <b>Phone:</b> ${phone || "-"}<br>
-        <b>Message:</b> ${message}<br>
-        <b>Location:</b> ${city || "-"}, ${region || "-"}, ${country || "-"}
-      `
-    });
-  } 
-  catch (emailErr) {
-    console.error("Email failed:", emailErr.message);
+    // ✅ EMAIL RUNS IN BACKGROUND
+    sendEmailInBackground(data);
+
+  } catch (err) {
+    console.error("API error:", err);
+    res.status(500).json({ message: "Server error" });
   }
-
-  res.json({ message: "Inquiry submitted successfully" });
 });
+
 
 /* START SERVER */
 app.listen(process.env.PORT || 5000, () => {
