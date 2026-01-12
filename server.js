@@ -88,6 +88,8 @@ app.post("/api/contact", async (req, res) => {
   catch (emailErr) {
     console.error("Email failed:", emailErr.message);
   }
+
+  res.json({ message: "Inquiry submitted successfully" });
 });
 
 /* START SERVER */
