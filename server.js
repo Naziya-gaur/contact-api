@@ -81,15 +81,12 @@ app.post("/api/contact", async (req, res) => {
         <b>Email:</b> ${email}<br>
         <b>Phone:</b> ${phone || "-"}<br>
         <b>Message:</b> ${message}<br>
-        <b>Location:</b> ${city}, ${region}, ${country}
+        <b>Location:</b> ${city || "-"}, ${region || "-"}, ${country || "-"}
       `
     });
-
-    res.json({ message: "Inquiry submitted successfully" });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+  } 
+  catch (emailErr) {
+    console.error("Email failed:", emailErr.message);
   }
 });
 
